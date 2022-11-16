@@ -1,19 +1,21 @@
 #!/usr/bin/bash
 
-PC='192.168.68.72'                          # PC ip address
-LAPTOP='192.168.68.87'                      # Laptop ip address
+# Assign your ip addresses underneath
+DEVICE1=''                                  # DEVICE1 ip address
+DEVICE2=''                                  # DEVICE2 ip address
 
 THIS=''                                     # This computer's ip address
 TARGET=''                                   # Target computer's ip address
 
-USER='khai'                                 # Host username
+# Assign your username here
+USER=''                                     # Host username
 NAME="ncp"                                  # Script name
 PING_COUNT=1                                # How many times to ping the target
+
+# Assign directories to sync here. Note that you need read/write permissions
 DIRS=(                                      # Directories to sync
     "Documents"
-    "Scripts"
-    "Study"
-    "repos"
+    "Downloads"
 )
 
 ####
@@ -23,8 +25,8 @@ function self_ip() {
     # Set this computer's IP address
     IPS='\n' read -ra THIS <<< "$(ip route | awk '{print $9}')" 
     case "${THIS[0]}" in
-        "$LAPTOP" ) TARGET="$PC" ;;
-        "$PC" ) TARGET="$LAPTOP" ;;
+        "$DEVICE2" ) TARGET="$DEVICE1" ;;
+        "$DEVICE1" ) TARGET="$DEVICE2" ;;
     esac
     return 0
 }
@@ -42,10 +44,7 @@ function pingTarget() {
         return 0
     fi
 }
-
-####
-# Help page
-####
+`
 function usage() {
     echo -n "Usage: $NAME [OPTION] ...
 

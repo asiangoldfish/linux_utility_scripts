@@ -44,10 +44,12 @@ function run()
     esac
     
     errno="$?"
-    if [ "$errno" != 0 ]; then exit; fi
+    if [ "$errno" != 0 ]; then return 1; fi
     
     shift; shift;                                       # keep args only
-    "$TMPDIR"/"$OUT" "$@"                             # execute with arguments
+    "$TMPDIR"/"$OUT" "$@"                               # execute with arguments
+
+    return 0
 }
 
 
@@ -79,6 +81,8 @@ function makeTmpDir()
 
 function clean()
 {
+    echo "Cleaning up..."
+
     if [ -d "$TMPDIR" ]; then
         rm -r "$TMPDIR"
         echo "Removed $TMPDIR"
@@ -94,10 +98,17 @@ fi
 for arg in "$@"; do
     case "$arg" in
         #'auto-compile' ) auto_run "$@"; exit;;
-        'debug' ) run 'debug' "$@"; exit;;
-        'clean' ) clean; exit;;
-        'run'   ) run 'release' "$@"; exit;;
-        'help' | * ) usage; exit;;
+        'debug' ) run 'debug' "$@"; break;;
+        'clean' ) clean; break;;
+        'run'   )
+            if run 'release' "$@"; then
+                clean
+            fi
+            break
+            ;;
+        'help' | * ) usage; break;;
     esac
     shift
 done
+
+clean
