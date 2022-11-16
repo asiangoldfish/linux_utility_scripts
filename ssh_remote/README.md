@@ -4,7 +4,7 @@ remote.sh is a wrapper script for the `ssh` command. It's usage design is to eff
 
 ## Sourcing to Shell Configurations
 
-You can either add remote.sh manually with editors like nano or vim, or use commands directly.
+You can either add remote.sh manually to PATH with a text editor, or use commands directly.
 
 **Bash**
 ```sh
