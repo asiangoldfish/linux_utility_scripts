@@ -12,3 +12,4 @@ All these scripts are written to suit my personal needs. Before using them, plea
 - [SSH Remote Access](ssh_remote)
 - [Suspend](suspend)
 - [Syncronize Devices](syncronize_devices)
+- [Simple Build](simple_build)
