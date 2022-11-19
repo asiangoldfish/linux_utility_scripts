@@ -1,36 +1,35 @@
 #!/usr/bin/bash
 
+NAME="$0"                   # This script's name
+
 BUILD_DIR="./out/build/" # Output directory
 ROOT_DIR="."             # The project's root directory
 APP="$BUILD_DIR/App"     # Executable file path
 BUILD_SYSTEM=""          # Project build system
+CACHE=".cache/simple_build" # Cache directory
 
 VERBOSE=0      # Whether to verbose output
 EXTRAVERBOSE=0 # Whether to extra verbose output
 
+OPTIONS="./simple_build.txt" # The file to fetch simple_build options from
+COMMENTS_PREFIX="#"       # Comments prefix in the OPTIONS file
+
 # Detects what build system the project uses
-function detect_system() {
-    # use nullglob in case there are no matching files
-    shopt -s nullglob
-
-    # Gets all files in the directory
-    local files=("$(ls .)")
-
-    for file in $files; do
-        case "$file" in
-        "Makefile")
-            BUILD_SYSTEM="Make"
-            break
-            ;;
-        "CMakeLists.txt")
-            BUILD_SYSTEM="CMake"
-            break
-            ;;
-        esac
-    done
+function initiate() {
+    # Detect build system
+    if [ -f "Makefile" ] || [ -f "makefile" ]; then
+        BUILD_SYSTEM="Make"
+    elif [ -f "CMakeLists.txt" ]; then
+        BUILD_SYSTEM="CMake"
+    fi
 
     # Return 1 if no build system was found, else 0
-    if [ -z "$BUILD_SYSTEM" ]; then return 1; else return 0; fi
+    if [ -z "$BUILD_SYSTEM" ]; then 
+        echo "$NAME: Could not detect build system"
+        return 1
+    fi
+
+    return 0
 }
 
 # Clean build directory
@@ -46,7 +45,8 @@ function build() {
     case "$BUILD_SYSTEM" in
     "Make") make ;;
     "CMake")
-        cmake -S "$ROOT_DIR" -B "$BUILD_DIR" &&
+        local cmake_options; cmake_options=$(parse_cmake_options)
+        cmake "$cmake_options" -S "$ROOT_DIR" -B "$BUILD_DIR" &&
             make -C "$BUILD_DIR"
         ;;
     esac
@@ -54,9 +54,38 @@ function build() {
 }
 
 # Run the program
-function execute_app {
+function execute_app() {
     "$APP"
 }
+
+# Parses CMake options
+function parse_cmake_options() {
+    local tmpFile="$CACHE/temporary_options.txt"
+
+    # Check if the OPTIONS file exist
+    if [ ! -f "$OPTIONS" ]; then
+        printf ""
+        return 0
+    fi
+
+    # Create cache directory
+    if [ ! -d "$CACHE" ]; then mkdir -p "$CACHE"; fi
+
+    # Copy the OPTIONS file to temporary file without comments
+    sed '/^\#/d' "$OPTIONS" > "$tmpFile" || return 1
+
+    # Concatenate all lines into one string
+    local output
+    output="$(cat < "$tmpFile" | paste -s -d' ')"
+
+    # Print lines without trailing whitespaces
+    printf '%s' "$output" | xargs
+
+    return 0
+}
+
+parse_cmake_options
+exit
 
 # Help page
 function usage() {
@@ -79,10 +108,8 @@ if [ "$#" == 0 ]; then
     exit 0
 fi
 
-if ! detect_system; then
-    echo "$0: Could not detect build system in this project"
-    exit 0
-fi
+# Initiate this script's requirements
+! initiate && exit 0
 
 # Loop arguments
 for arg in "$@"; do
