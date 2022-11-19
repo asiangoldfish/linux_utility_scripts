@@ -1,10 +1,12 @@
 #!/usr/bin/bash
 
-BUILD_DIR="./out/build/"     # Output directory
-ROOT_DIR="."                 # The project's root directory
-APP="$BUILD_DIR/App" # Executable file path
-VERBOSE=false                # Whether to verbose output
-BUILD_SYSTEM=""              # Project build system
+BUILD_DIR="./out/build/" # Output directory
+ROOT_DIR="."             # The project's root directory
+APP="$BUILD_DIR/App"     # Executable file path
+BUILD_SYSTEM=""          # Project build system
+
+VERBOSE=0      # Whether to verbose output
+EXTRAVERBOSE=0 # Whether to extra verbose output
 
 # Detects what build system the project uses
 function detect_system() {
@@ -12,7 +14,7 @@ function detect_system() {
     shopt -s nullglob
 
     # Gets all files in the directory
-    local files=( "$( ls . )" )
+    local files=("$(ls .)")
 
     for file in $files; do
         case "$file" in
@@ -43,7 +45,10 @@ function clean() {
 function build() {
     case "$BUILD_SYSTEM" in
     "Make") make ;;
-    "CMake") cmake -S "$ROOT_DIR" -B "$BUILD_DIR" && make -C "$BUILD_DIR"
+    "CMake")
+        cmake -S "$ROOT_DIR" -B "$BUILD_DIR" &&
+            make -C "$BUILD_DIR"
+        ;;
     esac
     return 0
 }
@@ -63,7 +68,8 @@ Options:
     -e, --execute           run the application
     -h, --help              this page
     -r, --rebuild           rebuild project
-    -v, --verbose           verbose output
+    -v, --verbose           only output stderr
+    -vv, --extra-verbose    output stdout and stderr
 "
 }
 
@@ -90,7 +96,15 @@ for arg in "$@"; do
         break
         ;;
     "-e" | "--execute") # Run program
-        build 1>/dev/null && execute_app
+        if [[ "$EXTRAVERBOSE" -eq 1 ]]; then
+            build
+        elif [[ "$VERBOSE" -eq 1 ]]; then
+            build 1>/dev/null
+        else
+            build &>/dev/null
+        fi
+
+        execute_app
         break
         ;;
     "-r" | "--rebuild") # Delete build files and build project
@@ -98,7 +112,10 @@ for arg in "$@"; do
         break
         ;;
     "-v" | "--verbose") # Verbose output
-        VERBOSE=true
+        VERBOSE=1
+        ;;
+    "-vv" | "--extra-verbose") # Extra verbose output
+        EXTRAVERBOSE=1
         ;;
     *) # Help page on invalid argument
         printf "%s: Invalid argument \'%s\'\n" "$0" "$arg"
