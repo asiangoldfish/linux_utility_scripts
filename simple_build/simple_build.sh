@@ -8,12 +8,15 @@ BUILD_SYSTEM=""              # Project build system
 
 # Detects what build system the project uses
 function detect_system() {
-    local files                       # All files in present working directory
-    IFS=' ' read -ra files <<<"$(ls)" # Gets all files in the directory
+    # use nullglob in case there are no matching files
+    shopt -s nullglob
 
-    for file in "${files[@]}"; do
+    # Gets all files in the directory
+    local files=( "$( ls . )" )
+
+    for file in $files; do
         case "$file" in
-        "Makefile" | "makefile")
+        "Makefile")
             BUILD_SYSTEM="Make"
             break
             ;;
