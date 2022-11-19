@@ -6,13 +6,12 @@ BUILD_DIR="./out/build/" # Output directory
 ROOT_DIR="."             # The project's root directory
 APP="$BUILD_DIR/App"     # Executable file path
 BUILD_SYSTEM=""          # Project build system
-CACHE=".cache/simple_build" # Cache directory
+CACHE="$HOME/.cache/simple_build" # Cache directory
 
 VERBOSE=0      # Whether to verbose output
 EXTRAVERBOSE=0 # Whether to extra verbose output
 
 OPTIONS="./simple_build.txt" # The file to fetch simple_build options from
-COMMENTS_PREFIX="#"       # Comments prefix in the OPTIONS file
 
 # Detects what build system the project uses
 function initiate() {
@@ -64,7 +63,7 @@ function parse_cmake_options() {
 
     # Check if the OPTIONS file exist
     if [ ! -f "$OPTIONS" ]; then
-        printf ""
+        printf ""q
         return 0
     fi
 
@@ -72,6 +71,7 @@ function parse_cmake_options() {
     if [ ! -d "$CACHE" ]; then mkdir -p "$CACHE"; fi
 
     # Copy the OPTIONS file to temporary file without comments
+    # Change the sed expression to change the comment prefix
     sed '/^\#/d' "$OPTIONS" > "$tmpFile" || return 1
 
     # Concatenate all lines into one string
@@ -83,9 +83,6 @@ function parse_cmake_options() {
 
     return 0
 }
-
-parse_cmake_options
-exit
 
 # Help page
 function usage() {
