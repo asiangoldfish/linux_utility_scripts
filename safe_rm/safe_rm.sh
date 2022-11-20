@@ -1,43 +1,5 @@
 #!/usr/bin/bash
 
-################################################################################
-## LICENSE:                                                                   ##
-## The MIT License (MIT)                                                      ##
-## Copyright © 2022 Khai Duong                                                ##
-##                                                                            ##
-## Permission is hereby granted, free of charge, to any person obtaining a    ##
-## copy of this software and associated documentation files (the “Software”), ##
-## to deal in the Software without restriction, including without limitation  ##
-## the rights to use, copy, modify, merge, publish, distribute, sublicense,   ##
-## and/or sell copies of the Software, and to permit persons to whom the      ##
-## Software is furnished to do so, subject to the following conditions:       ##
-##                                                                            ##
-## The above copyright notice and this permission notice shall be included in ##
-## all copies or substantial portions of the Software.                        ##
-##                                                                            ##
-## THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR ##
-## IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,   ##
-## FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL    ##
-## THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER ##
-## LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING    ##
-## FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER        ##
-## DEALINGS IN THE SOFTWARE.                                                  ##
-################################################################################
-
-################################################################################
-## DISCLAIMER:                                                                ##
-## Please review the script before using it for yourself.                     ##
-################################################################################
-
-################################################################################
-## Add this script to PATH before using it.                                   ##
-## To temporarily adding it to PATH, use the following command:               ##
-##    PATH="PATH:[SCRIPT_PATH]"                                               ##
-## Replace '[SCRIPT_PATH]' with the script's actual file path                 ##
-## To add it to PATH permanently, add the same line in your .bashrc           ##
-## configuration file.                                                        ##
-################################################################################
-
 PAPERBIN="$HOME/Paperbin"                          # Directory with all trashed files
 PROJECT_NAME="safe_rm"                             # This project's name
 RECORD="$XDG_CONFIG_HOME/$PROJECT_NAME/record.txt" # Record of all current files in paperbin
@@ -58,25 +20,36 @@ function main() {
     local content_hash       # A file content's md5 checksum
     local new_filename       # Combined hashes
 
-    # Iterate all files to delete
+    ## Iterate all files to delete
+    ## For directories
+    ##      1. archives the directory in the tarball format
+    ##      2. checksum the tar file with md5
+    ##      3. stores the checksum in the record
+    ##      4. moves the tar file to the paperbin
     for file in "${FILES[@]}"; do
 
-        # Move directory to paperbin
+        # Move selected directory to paperbin
         if [ -d "$file" ]; then
             # Figure out whether files exist in the directory
-            ls_out="$(ls -l "$file" | wc -l)" # ls output
+            ls_out="$(find "$file" | wc -l)" # ls output
 
-            # TODO - Implement checksum
+            # Remove the last / in the filepath
+            if [[ "$file" == */ ]]; then file="${file::-1}"; fi
 
             # Check for '-r' flag before moving non-empty directories
             if [[ "$ls_out" -gt 1 ]] && validateFlags "-r"; then
-                # Hash the file path and file content, then merge into the file's new name
-                moveToBin "$file" "$PAPERBIN"
-                status_movetobin="$?"
 
                 # Only track the file if the transfer was successful
-                if [ "$status_movetobin" == 0 ]; then
-                    appendToFile "$file" "$RECORD"
+                if moveToBin "$file" "$PAPERBIN"; then
+
+                    # Archive the directory to get its checksum
+                    tar -P -cf "$PAPERBIN/$file.tar" "$PAPERBIN/$file"
+                    IFS=' ' read -ra checksum <<< "$(md5sum "$PAPERBIN/$file.tar")"
+                    appendToFile "$file" "$RECORD" "${checksum[0]}"
+                    rm "$PAPERBIN/$file.tar"
+                    
+                    # Rename deleted directory to the hash
+                    mv "$PAPERBIN/$file" "$PAPERBIN/${checksum[0]}"
                 fi
 
             # Move empty directories
@@ -110,10 +83,11 @@ function main() {
 # Append file content to another file
 ####
 function appendToFile() {
-    SOURCE="$1"
-    TARGET="$2"
+    local source="$1"
+    local target="$2"
+    local checksum="$3"
 
-    echo "$(readlink -f "$SOURCE") $SOURCE" >>"$TARGET"
+    echo "$(readlink -f "$source") $checksum" >> "$target"
 
     return 0
 }
@@ -183,6 +157,8 @@ function initialize() {
 
     # readlink - Utility from the GNU coreutils project
     command -v readlink &>/dev/null || return 1
+
+    command -v tar &> /dev/null || { echo "$PROJECT_NAME: Could not find command 'tar'"; return 1; }
 
     return 0
 }
@@ -275,9 +251,7 @@ function parseCli() {
             list
             return 0
             ;;
-        "-r" | "--recursively")
-            RECURSIVE=true
-            ;;
+        "-r" | "--recursively") RECURSIVE=true ;;
         *)
             # Output error if the invalid flag starts with '--'
             if [ "${1:0:2}" == '--' ]; then
