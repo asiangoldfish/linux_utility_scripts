@@ -5,8 +5,9 @@ PROJECT_NAME="safe_rm"                             # This project's name
 RECORD="$XDG_CONFIG_HOME/$PROJECT_NAME/record.txt" # Record of all current files in paperbin
 
 # Modify color output
-COLOR_DIR="\e[34m" # Directory print color
-COLOR_END="\e[0m"  # End color modification
+ENABLE_COLORS=false     # Enable colored output
+COLOR_DIR="\e[34m"      # Directory print color
+COLOR_END="\e[0m"       # End color modification
 
 # Modify font output
 BOLD="$(tput bold)"
@@ -209,8 +210,13 @@ function list() {
         if [ -d "$file" ]; then
             # Get file name
             filename="$( echo "$( basename "${matchedEntry}" )" | awk '{printf $1 " "}' )"
-            # Print with color
-            echo -en "$COLOR_DIR$BOLD$filename$COLOR_END$NORMAL "
+            
+            # Print with color if enabled
+            if [ "$ENABLE_COLORS" == true ]; then
+                echo -en "$COLOR_DIR$BOLD$filename$COLOR_END$NORMAL "
+            else
+                echo -n "$filename"
+            fi
         else
             echo -n "$file" | awk '{printf $1 " "} '
         fi
@@ -268,10 +274,12 @@ Usage: del [OPTIONS] files...
 Moves files to the paperbin for review instead of permanently deleting them.
 
 OPTIONS:
+    -c, --colored           enable colored output
     -e, --empty-bin         empty the paperbin
     -h, --help              this page
-    -l, --list              list all items in the paperbin
-    -r, --recursive         moves non-empty directory to paperbin
+    -l, --list              list all deleted files
+      , --print-record      print the record file's content
+    -r, --recursive         needed to move delete non-empty directories
 EOF
 }
 
@@ -288,6 +296,8 @@ function parseCli() {
 
     for arg in "$@"; do
         case "$arg" in
+        # Enable colored output
+        "-c" | "--colored" ) ENABLE_COLORS=true ;;
         # Empty the paper bin
         "-e" | "--empty-bin") emptyBin; return 0 ;;
         
