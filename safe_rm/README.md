@@ -1,13 +1,15 @@
 # Safe rm
 
-Although not nearly powerful as `rm`, Safe rm stores deleted files and directories in the paperbin. This allows recovering the file to its original location.
+Although not nearly powerful as `rm`, Safe rm stores deleted files and 
+directories in the paperbin. This allows recovering the file to its original
+location.
 
 # Table of Content
 - [Usage](#usage)
 - [Installation](#installation)
 - [Commands](#commands)
 - [How It Works](#how-it-works)
-- [License](#license)
+- [The Record File](#the-record-file)
 - [TODOs](#todos)
 
 # Usage
@@ -42,21 +44,28 @@ source ~/.bashrc
 |:--------|:------------|
 | del [files/directories] | List all files and directories to delete |
 | del -r | To remove non-empty directories, the `-r` flag must be included |
-| del -l | List all files in the paperbin and their origin |
+| del -l | List all files in the paperbin, similarly to the `ls` command |
 | del -e | Empty the paperbin |
+| del --print-record | Prints all content in the record file |
 
 # How It Works
-In the user's home directory, a new directory `Paperbin` is created. All "deleted" files and directories is placed here. A records file is also created as `~/.config/safe_rm/record.txt`. The script only supports deleting file which the user has write access to. There is no plan to change this behaviour.
+In the user's home directory, a new directory `Paperbin` is created. All
+"deleted" files and directories is placed here. A records file is also created
+as `~/.config/safe_rm/record.txt`. The script only supports deleting file which
+the user has write access to. There is no plan to change this behaviour.
 
-# License
-The MIT License (MIT)
-Copyright © 2022 Khai Duong
+# The Record File
+There is an automatically generated file called `Record` in the
+`~/.config/safe_rm` directory. This contains a list of all deleted files with
+their original file path and checksum. *safe_rm* generates the checksum based on
+the two following conditions:
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+- If the file is a directory, then:
+    1. Uses the `tar` command to archive it
+    2. Generates the archive file's MD5 checksum
+- If the file is indeed a file, then:
+    1. Directly generates the file's MD5 checksum.
 
 # TODOs
-- Implement file and directory checksums before moving them to the paperbin
+[x] Implement file and directory checksums before moving them to the paperbin  
+[ ] Implement feature to restore files back to their original path  

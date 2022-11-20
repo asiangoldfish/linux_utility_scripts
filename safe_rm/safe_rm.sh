@@ -4,6 +4,14 @@ PAPERBIN="$HOME/Paperbin"                          # Directory with all trashed 
 PROJECT_NAME="safe_rm"                             # This project's name
 RECORD="$XDG_CONFIG_HOME/$PROJECT_NAME/record.txt" # Record of all current files in paperbin
 
+# Modify color output
+COLOR_DIR="\e[34m" # Directory print color
+COLOR_END="\e[0m"  # End color modification
+
+# Modify font output
+BOLD="$(tput bold)"
+NORMAL="$(tput sgr0)"
+
 ####
 # Main program
 ####
@@ -44,10 +52,10 @@ function main() {
 
                     # Archive the directory to get its checksum
                     tar -P -cf "$PAPERBIN/$file.tar" "$PAPERBIN/$file"
-                    IFS=' ' read -ra checksum <<< "$(md5sum "$PAPERBIN/$file.tar")"
+                    IFS=' ' read -ra checksum <<<"$(md5sum "$PAPERBIN/$file.tar")"
                     appendToFile "$file" "$RECORD" "${checksum[0]}"
                     rm "$PAPERBIN/$file.tar"
-                    
+
                     # Rename deleted directory to the hash
                     mv "$PAPERBIN/$file" "$PAPERBIN/${checksum[0]}"
                 fi
@@ -87,7 +95,7 @@ function appendToFile() {
     local target="$2"
     local checksum="$3"
 
-    echo "$(readlink -f "$source") $checksum" >> "$target"
+    echo "$(readlink -f "$source") $checksum" >>"$target"
 
     return 0
 }
@@ -96,11 +104,12 @@ function appendToFile() {
 # Check if the paperbin exists
 ####
 function doesBinExist() {
-    if [ -d "$PAPERBIN" ]; then return 0; fi
-
-    printf "There is no paperbin in your home directory. Aborting...\n"
-    return 1
-
+    if [ -d "$PAPERBIN" ]; then
+        return 0
+    else
+        printf "No paperbin was found\n"
+        return 1
+    fi
 }
 
 ####
@@ -158,18 +167,58 @@ function initialize() {
     # readlink - Utility from the GNU coreutils project
     command -v readlink &>/dev/null || return 1
 
-    command -v tar &> /dev/null || { echo "$PROJECT_NAME: Could not find command 'tar'"; return 1; }
+    command -v tar &>/dev/null || {
+        echo "$PROJECT_NAME: Could not find command 'tar'"
+        return 1
+    }
 
     return 0
 }
 
+# TODO - Clean up the below function. It's super messy and unreadable
+
 ####
 # List all items in the paperbin
+#
+# Utilizes entries in the record to compute what the names of the files are.
+# Provides similar functionality to the ls command
 ####
 function list() {
-    if ! doesBinExist; then exit 1; fi
+    local files        # Files in the paperbin
+    local matchedEntry # Hashed file name matched with record entry
+    local filename     # Name of the matched file
 
-    cat "$RECORD"
+    # Return if no paperbin was found
+    if ! doesBinExist; then return 1; fi
+
+    # Change dir to the paperbin if possible
+    cd "$PAPERBIN" ||
+        printf '%s: Access to paperbin, permission denied' "$PROJECT_NAME"
+
+    # For each file in the paperbin, find its name from the record and print it
+    files=(*)
+    local IFS=/
+
+    # Iterate all files in the paperbin
+    # If the file is a directory, print it in blue color
+    for file in "${files[@]}"; do
+        # Attempt to match file name with the entry
+        matchedEntry="$(cat <"$RECORD" | grep "$file")"
+
+        # Print coloured output for directories
+        if [ -d "$file" ]; then
+            # Get file name
+            filename="$( echo "$( basename "${matchedEntry}" )" | awk '{printf $1 " "}' )"
+            # Print with color
+            echo -en "$COLOR_DIR$BOLD$filename$COLOR_END$NORMAL "
+        else
+            echo -n "$file" | awk '{printf $1 " "} '
+        fi
+    done
+
+    printf "\n"
+
+    return 0
 }
 
 ####
@@ -239,20 +288,23 @@ function parseCli() {
 
     for arg in "$@"; do
         case "$arg" in
-        "-e" | "--empty-bin")
-            emptyBin
-            return 0
-            ;;
-        "-h" | "--help")
-            usage
-            return 0
-            ;;
-        "-l" | "--list")
-            list
-            return 0
-            ;;
+        # Empty the paper bin
+        "-e" | "--empty-bin") emptyBin; return 0 ;;
+        
+        # Print help page
+        "-h" | "--help") usage; return 0 ;;
+        
+        # List files and directories in the paperbin
+        "-l" | "--list") list; return "$?" ;;
+
+        # Print the record file
+        "--print-record") cat "$RECORD"; return 0 ;;
+        
+        # Do things recursively with non-empty directories
         "-r" | "--recursively") RECURSIVE=true ;;
-        *)
+
+        # Everything else
+        *) 
             # Output error if the invalid flag starts with '--'
             if [ "${1:0:2}" == '--' ]; then
                 printf "del: unrecognized option %s\n" "$1"
@@ -263,7 +315,6 @@ function parseCli() {
                 printf "del: unrecognized option %s\n" "${1:0:2}"
                 printf "Try \'del --help\' for more information.\n"
                 exit 1
-
             fi
 
             # Assumes all other arguments to be file names
