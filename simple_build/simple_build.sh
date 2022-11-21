@@ -11,15 +11,21 @@ CACHE="$HOME/.cache/simple_build" # Cache directory
 VERBOSE=0      # Whether to verbose output
 EXTRAVERBOSE=0 # Whether to extra verbose output
 
-OPTIONS="./simple_build.txt" # The file to fetch simple_build options from
+OPTIONS="./simple_build.conf" # The file to fetch simple_build options from
 
 # Detects what build system the project uses
 function initiate() {
+    local makeTarget                # Make's target executable
     # Detect build system
     if [ -f "Makefile" ] || [ -f "makefile" ]; then
         BUILD_SYSTEM="Make"
     elif [ -f "CMakeLists.txt" ]; then
         BUILD_SYSTEM="CMake"
+    fi
+
+    # If the build system is Make, parse the options file for cmake
+    if [ "$BUILD_SYSTEM" == "Make" ]; then
+        parse_make_options
     fi
 
     # Return 1 if no build system was found, else 0
@@ -44,7 +50,7 @@ function build() {
     case "$BUILD_SYSTEM" in
     "Make") make ;;
     "CMake")
-        local cmake_options; cmake_options=$(parse_cmake_options)
+        local cmake_options=$(parse_cmake_options)
         cmake "$cmake_options" -S "$ROOT_DIR" -B "$BUILD_DIR" &&
             make -C "$BUILD_DIR"
         ;;
@@ -54,7 +60,12 @@ function build() {
 
 # Run the program
 function execute_app() {
-    "$APP"
+    if [ -z "$APP" ]; then
+        echo "$NAME: Could not find executable"
+        return 1
+    else
+        return 0
+    fi
 }
 
 # Parses CMake options
@@ -82,6 +93,13 @@ function parse_cmake_options() {
     printf '%s' "$output" | xargs
 
     return 0
+}
+
+# Parse Make options
+function parse_make_options() {
+    # Source the options file
+    source "$OPTIONS"
+    APP="$TARGET"
 }
 
 # Help page
