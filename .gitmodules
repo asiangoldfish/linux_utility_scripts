@@ -1,0 +1,6 @@
+[submodule "simple_build/--name"]
+	path = simple_build/--name
+	url = https://gist.github.com/asiangoldfish/e72f7341c7516f6300162a4a1b44c4b8
+[submodule "simple_build/ini_parser"]
+	path = simple_build/ini_parser
+	url = https://gist.github.com/asiangoldfish/e72f7341c7516f6300162a4a1b44c4b8
