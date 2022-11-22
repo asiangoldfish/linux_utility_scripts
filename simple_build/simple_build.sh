@@ -1,31 +1,85 @@
 #!/usr/bin/bash
 
-NAME="$0"                   # This script's name
+################################################################################
+#                            This script's base details                        #
+################################################################################
+NAME="$( basename "$0" )"                                   # This script's name
+LOCAL_SCRIPT="./simple_build.sh"                            # This script's name in a project
+SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # Script parent dir
 
-BUILD_DIR="./out/build/" # Output directory
-ROOT_DIR="."             # The project's root directory
-APP="$BUILD_DIR/App"     # Executable file path
-BUILD_SYSTEM=""          # Project build system
-CACHE="$HOME/.cache/simple_build" # Cache directory
+# If this script exists in the project directory, then use that instead.
+# Skip if that script and the current one are the same
+if [ -f "$LOCAL_SCRIPT" ] && [ ! "$(find $LOCAL_SCRIPT)" == "$NAME"  ]; then
+    if source "$LOCAL_SCRIPT"; then 
+        exit 0 
+    else
+        echo "$NAME: Could not source the local script"
+        exit 1
+    fi 
+fi
+################################################################################
 
-VERBOSE=0      # Whether to verbose output
-EXTRAVERBOSE=0 # Whether to extra verbose output
+################################################################################
+#                            Build details                                     #
+################################################################################
+BUILD_DIR="./out/build/"                # Output directory
+ROOT_DIR="."                            # The project's root directory
+TARGET_EXECUTABLE="$BUILD_DIR/App"      # Executable file path
+BUILD_SYSTEM=""                         # Project build system
+CACHE="$HOME/.cache/simple_build"       # Cache directory
 
-OPTIONS="./simple_build.conf" # The file to fetch simple_build options from
+INI_PARSER=""                           # Ini parser script
 
-# Detects what build system the project uses
+VERBOSE=0                               # Whether to verbose output
+EXTRAVERBOSE=0                          # Whether to extra verbose output
+
+OPTIONS="simple_build.conf"             # Options to configure script behaviour
+################################################################################
+
+####
+# Initiates important processes for this script
+#
+# 1. Figures out wether this script is a working symlink and sets its path
+#    accordingly
+# 2. Checks whether the ini parser exists and returns an error if not
+# 3. Checks whether the target project includes an options file. See OPTIONS
+#    for its filepath
+# 4. Detects the project's build system
+####
 function initiate() {
-    local makeTarget                # Make's target executable
-    # Detect build system
-    if [ -f "Makefile" ] || [ -f "makefile" ]; then
-        BUILD_SYSTEM="Make"
-    elif [ -f "CMakeLists.txt" ]; then
-        BUILD_SYSTEM="CMake"
+    # Checks if this script is a working symlink
+    if [[ -L "$SCRIPT_PATH/$NAME" ]] && [ -e "$SCRIPT_PATH/$NAME" ]; then
+        # If this script indeed is a symlink, then find the real path
+        SCRIPT_PATH="$( readlink "$( command -v configure.sh )" )"
+        SCRIPT_PATH="$( dirname "$SCRIPT_PATH" )"
+    else
+        echo "$NAME: This script might be a link, but it doesn't exist"
+        return 1
     fi
 
-    # If the build system is Make, parse the options file for cmake
-    if [ "$BUILD_SYSTEM" == "Make" ]; then
-        parse_make_options
+    # Checks that the ini_parser script exists
+    # INI_PARSER="$SCRIPT_PATH/ini_parser/ini_parser.py" # Ini parser script
+    INI_PARSER="$HOME/Documents/UTILITIES/ini_parser/ini_parser.py" # Ini parser script
+
+    if [ ! -f "$INI_PARSER" ]; then
+        echo "$NAME: Could not find the ini parser"
+        return 1
+    fi
+
+    # Checks that the options file exists
+    if [ ! -f "$OPTIONS" ]; then
+        echo -e "$NAME: Could not find \'$OPTIONS\'"
+        return 1
+    fi
+
+    # Detect build system and source parse_conf.sh accordingly
+    if [ -f "Makefile" ] || [ -f "makefile" ]; then
+        BUILD_SYSTEM="Make"
+        source "$SCRIPT_PATH/$BUILD_SYSTEM/parse_conf.sh"
+    elif [ -f "CMakeLists.txt" ]; then
+        BUILD_SYSTEM="CMake"
+        source "$SCRIPT_PATH/$BUILD_SYSTEM/parse_conf.sh"
+        parse_cmake_options
     fi
 
     # Return 1 if no build system was found, else 0
@@ -50,7 +104,6 @@ function build() {
     case "$BUILD_SYSTEM" in
     "Make") make ;;
     "CMake")
-        local cmake_options=$(parse_cmake_options)
         cmake "$cmake_options" -S "$ROOT_DIR" -B "$BUILD_DIR" &&
             make -C "$BUILD_DIR"
         ;;
@@ -60,46 +113,20 @@ function build() {
 
 # Run the program
 function execute_app() {
-    if [ -z "$APP" ]; then
+    if [ -z "$TARGET_EXECUTABLE" ]; then
         echo "$NAME: Could not find executable"
         return 1
     else
+        "$TARGET_EXECUTABLE"
         return 0
     fi
-}
-
-# Parses CMake options
-function parse_cmake_options() {
-    local tmpFile="$CACHE/temporary_options.txt"
-
-    # Check if the OPTIONS file exist
-    if [ ! -f "$OPTIONS" ]; then
-        printf ""q
-        return 0
-    fi
-
-    # Create cache directory
-    if [ ! -d "$CACHE" ]; then mkdir -p "$CACHE"; fi
-
-    # Copy the OPTIONS file to temporary file without comments
-    # Change the sed expression to change the comment prefix
-    sed '/^\#/d' "$OPTIONS" > "$tmpFile" || return 1
-
-    # Concatenate all lines into one string
-    local output
-    output="$(cat < "$tmpFile" | paste -s -d' ')"
-
-    # Print lines without trailing whitespaces
-    printf '%s' "$output" | xargs
-
-    return 0
 }
 
 # Parse Make options
 function parse_make_options() {
     # Source the options file
     source "$OPTIONS"
-    APP="$TARGET"
+    TARGET_EXECUTABLE="$TARGET"
 }
 
 # Help page
