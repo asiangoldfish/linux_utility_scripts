@@ -5,7 +5,7 @@ BUILD_FILE="CMakeLists.txt"     # Special configuration file in project dir
 
 # The build system's invocation command
 BUILD_COMMAND="cmake $cmake_options -S $ROOT_DIR -B $BUILD_DIR && \
-            make -C $BUILD_DIR"
+make -C $BUILD_DIR"
 
 # Command to clear files, like build files
 CLEAN_COMMAND="rm -rf $BUILD_DIR"
@@ -51,6 +51,10 @@ function parse_options() {
             cmake_options+=( "$key=$value" )
         done < <( printf '%s\n' "$build_options")
     fi
+
+    # Update build command as we just updated cmake_options
+    BUILD_COMMAND="cmake ${cmake_options[*]} -S $ROOT_DIR -B $BUILD_DIR && \
+make -C $BUILD_DIR"
 
     return 0
 }

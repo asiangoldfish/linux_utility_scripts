@@ -114,6 +114,7 @@ function initiate() {
         elif [ -f "$tmp_build_file" ]; then
             source "$tmp_parse_conf"
             parse_options
+        
             break
         else
             echo "$NAME: Error at line no. $LINENO:" 
@@ -126,6 +127,7 @@ echo -e "\tUnexpected behavioural in the if-statements. This shouldn't happen"
         echo "$NAME: Could not detect build system"
         return 1
     fi
+
 
     return 0
 }
