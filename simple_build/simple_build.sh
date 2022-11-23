@@ -22,11 +22,16 @@ fi
 ################################################################################
 #                            Build details                                     #
 ################################################################################
-BUILD_DIR="./out/build/"                # Output directory
+BUILD_DIR="./out/build/"                # Default output directory
 ROOT_DIR="."                            # The project's root directory
 TARGET_EXECUTABLE="$BUILD_DIR/App"      # Executable file path
 BUILD_SYSTEM=""                         # Project build system
 CACHE="$HOME/.cache/simple_build"       # Cache directory
+
+BUILD_FILE=""                           # Special config file for the build
+                                        # system, like CMakeLists.txt. This
+                                        # is set by the build system's dirname
+                                        # in this script's SCRIPT_PATH
 
 INI_PARSER=""                           # Ini parser script
 
@@ -47,20 +52,21 @@ OPTIONS="simple_build.conf"             # Options to configure script behaviour
 # 4. Detects the project's build system
 ####
 function initiate() {
-    # Checks if this script is a working symlink
+    # Checks if this script is a working symlink. This is important to properly
+    # find custom functions for specific build systems.
     if [[ -L "$SCRIPT_PATH/$NAME" ]] && [ -e "$SCRIPT_PATH/$NAME" ]; then
         # If this script indeed is a symlink, then find the real path
-        SCRIPT_PATH="$( readlink "$( command -v configure.sh )" )"
-        SCRIPT_PATH="$( dirname "$SCRIPT_PATH" )"
+        SCRIPT_PATH="$( readlink "$( command -v configure.sh )" )" # Ful path
+        SCRIPT_PATH="$( dirname "$SCRIPT_PATH" )"                 # Dirname only
     else
+        # Executes this block if the link can't be found or is broken.
         echo "$NAME: This script might be a link, but it doesn't exist"
         return 1
     fi
 
-    # Checks that the ini_parser script exists
-    # INI_PARSER="$SCRIPT_PATH/ini_parser/ini_parser.py" # Ini parser script
-    INI_PARSER="$HOME/Documents/UTILITIES/ini_parser/ini_parser.py" # Ini parser script
-
+    # Checks that the ini_parser script exists. This is used to parse variables
+    # from the OPTIONS file.
+    INI_PARSER="$SCRIPT_PATH/lib/ini_parser/ini_parser.py" # Ini parser script
     if [ ! -f "$INI_PARSER" ]; then
         echo "$NAME: Could not find the ini parser"
         return 1
@@ -72,18 +78,51 @@ function initiate() {
         return 1
     fi
 
-    # Detect build system and source parse_conf.sh accordingly
-    if [ -f "Makefile" ] || [ -f "makefile" ]; then
-        BUILD_SYSTEM="Make"
-        source "$SCRIPT_PATH/$BUILD_SYSTEM/parse_conf.sh"
-    elif [ -f "CMakeLists.txt" ]; then
-        BUILD_SYSTEM="CMake"
-        source "$SCRIPT_PATH/$BUILD_SYSTEM/parse_conf.sh"
-        parse_cmake_options
-    fi
+    # Detect build system by iterating all directories in the SCRIPT_PATH,
+    # excluding directories from EXCLUDE_DIRS. Then, source parse_conf.sh
+    # accordingly
+    local all_dirs          # All directories within the script's path
+    local dir               # Iterated directory
+    local tmp_build_file    # Found BUILD_FILE in iterated directory
+    local tmp_parse_conf    # Iterated parse_conf.sh
+    local item
+
+    IFS=' ' read -ra all_dirs <<< "$( echo "$SCRIPT_PATH"/* )"
+
+    for dir in "${all_dirs[@]}"; do
+        # Skip iteration if the selected item is not a directory
+        if [ ! -d "$dir" ]; then continue; fi
+
+        tmp_parse_conf="$dir/parse_conf.sh"
+        
+        # Go to next iteration if the parse_conf.sh file doesn't exist
+        if [ -f "$tmp_parse_conf" ]; then
+            tmp_build_file="$( source "$tmp_parse_conf" && echo "$BUILD_FILE" )"
+        else
+            continue
+        fi
+
+        # Detect build system in project
+        if [ -z "$tmp_build_file" ]; then
+            # Print error message if the BUILD_FILE variable is empty
+            # Example: CMakeLists.txt or Makefile
+            echo "$NAME: Missing $tmp_build_file" > /dev/stderr
+            return 1
+        elif [ ! -f "$tmp_build_file" ]; then
+            # Go to next iteration if the build configuration is not found
+            continue
+        elif [ -f "$tmp_build_file" ]; then
+            source "$tmp_parse_conf"
+            parse_options
+            break
+        else
+            echo "$NAME: Error at line no. $LINENO:" 
+echo -e "\tUnexpected behavioural in the if-statements. This shouldn't happen"
+        fi
+    done
 
     # Return 1 if no build system was found, else 0
-    if [ -z "$BUILD_SYSTEM" ]; then 
+    if [ -z "$BUILD_FILE" ]; then 
         echo "$NAME: Could not detect build system"
         return 1
     fi
@@ -93,22 +132,26 @@ function initiate() {
 
 # Clean build directory
 function clean() {
-    case "$BUILD_SYSTEM" in
-    "Make") make clean ;;
-    "CMake") rm -rf "$BUILD_DIR" ;;
-    esac
+    # Output error if clean command is not found
+    if [ -z "$CLEAN_COMMAND" ]; then
+        echo "$NAME: Clean command not found" > /dev/stderr
+        return 1
+    else
+        eval "$CLEAN_COMMAND"
+        return "$?"
+    fi
 }
 
 # Build project
 function build() {
-    case "$BUILD_SYSTEM" in
-    "Make") make ;;
-    "CMake")
-        cmake "$cmake_options" -S "$ROOT_DIR" -B "$BUILD_DIR" &&
-            make -C "$BUILD_DIR"
-        ;;
-    esac
-    return 0
+    # Output error if build command was not found
+    if [ -z "$BUILD_COMMAND" ]; then
+        echo "$NAME: Missing build command. Ensure that it's passed using the BUILD_COMMAND variable in file 'parse_conf.sh'" > /dev/stderr
+        return 1
+    else
+        eval "$BUILD_COMMAND"
+        return "$?"
+    fi
 }
 
 # Run the program
@@ -118,20 +161,15 @@ function execute_app() {
         return 1
     else
         "$TARGET_EXECUTABLE"
-        return 0
+        return "$?"
     fi
-}
-
-# Parse Make options
-function parse_make_options() {
-    # Source the options file
-    source "$OPTIONS"
-    TARGET_EXECUTABLE="$TARGET"
 }
 
 # Help page
 function usage() {
     echo -n "Usage: $NAME [OPTION] ...
+
+$NAME, a management script for more efficient build process during development
 
 Options:
     -b, --build             build project
@@ -152,6 +190,7 @@ fi
 
 # Initiate this script's requirements
 ! initiate && exit 0
+
 
 # Loop arguments
 for arg in "$@"; do

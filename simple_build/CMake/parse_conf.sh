@@ -1,6 +1,17 @@
 
+BUILD_DIR="./out/build/"                # Output directory
+
+BUILD_FILE="CMakeLists.txt"     # Special configuration file in project dir
+
+# The build system's invocation command
+BUILD_COMMAND="cmake $cmake_options -S $ROOT_DIR -B $BUILD_DIR && \
+            make -C $BUILD_DIR"
+
+# Command to clear files, like build files
+CLEAN_COMMAND="rm -rf $BUILD_DIR"
+
 # Parses CMake options
-function parse_cmake_options() {
+function parse_options() {
     # Get the final executable path
     local tmpFile="$CACHE/temporary_options.txt"
     local iniSection="options"      # The section where all cmake options reside
