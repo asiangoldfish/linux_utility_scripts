@@ -1,0 +1,5 @@
+# Directory where all compiled binaries reside
+BUILD_DIR="./bin"
+
+# Target executable file path
+TARGET_EXECUTABLE="./bin/app"

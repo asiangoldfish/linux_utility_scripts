@@ -8,5 +8,4 @@ CLEAN_COMMAND="make clean"
 function parse_options() {
     # Source the options file
     source "$OPTIONS"
-    TARGET_EXECUTABLE="$TARGET"
 }

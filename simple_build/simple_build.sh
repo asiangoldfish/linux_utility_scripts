@@ -6,6 +6,7 @@
 NAME="$( basename "$0" )"                                   # This script's name
 LOCAL_SCRIPT="./simple_build.sh"                            # This script's name in a project
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # Script parent dir
+CONF_TEMPLATE=''                                            # simple_build.conf template
 
 # If this script exists in the project directory, then use that instead.
 # Skip if that script and the current one are the same
@@ -24,7 +25,7 @@ fi
 ################################################################################
 BUILD_DIR="./out/build/"                # Default output directory
 ROOT_DIR="."                            # The project's root directory
-TARGET_EXECUTABLE="$BUILD_DIR/App"      # Executable file path
+TARGET_EXECUTABLE=""                    # Executable file path
 BUILD_SYSTEM=""                         # Project build system
 CACHE="$HOME/.cache/simple_build"       # Cache directory
 
@@ -72,9 +73,9 @@ function initiate() {
         return 1
     fi
 
-    # Checks that the options file exists
+    # Generate an options file if it doesn't already exist
     if [ ! -f "$OPTIONS" ]; then
-        echo -e "$NAME: Could not find \'$OPTIONS\'"
+        generateOptionsFile
         return 1
     fi
 
@@ -85,7 +86,6 @@ function initiate() {
     local dir               # Iterated directory
     local tmp_build_file    # Found BUILD_FILE in iterated directory
     local tmp_parse_conf    # Iterated parse_conf.sh
-    local item
 
     IFS=' ' read -ra all_dirs <<< "$( echo "$SCRIPT_PATH"/* )"
 
@@ -128,6 +128,10 @@ echo -e "\tUnexpected behavioural in the if-statements. This shouldn't happen"
         return 1
     fi
 
+    # Source local project's simple_build.conf
+    if [ -f "./simple_build.conf" ]; then
+        source "./simple_build.conf"
+    fi
 
     return 0
 }
@@ -167,6 +171,33 @@ function execute_app() {
     fi
 }
 
+####
+# Helper function that finds the absolute file path of the
+# simple_build.conf template
+####
+function setConfTemplate() {
+    CONF_TEMPLATE="$SCRIPT_PATH/sb_conf.template"
+}
+
+####
+# Copy the simple_build.conf template to $PWD
+function generateOptionsFile() {
+    # Figure where the template is stored on the system
+    setConfTemplate
+
+    if [ ! -f "./simple_build.conf" ]; then
+        echo "Generating simple_build.conf..."
+
+        cp "$CONF_TEMPLATE" "$PWD/simple_build.conf"
+
+        echo "simple_build.conf has been generated."
+        echo "Please review it before executing this command again"
+        return 1
+    else
+        return 0
+    fi
+}
+
 # Help page
 function usage() {
     echo -n "Usage: $NAME [OPTION] ...
@@ -192,7 +223,6 @@ fi
 
 # Initiate this script's requirements
 ! initiate && exit 0
-
 
 # Loop arguments
 for arg in "$@"; do
