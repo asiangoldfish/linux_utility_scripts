@@ -40,6 +40,7 @@ function fullUpgrade() {
     fi
 
     # Edit this case-block to add new commands to execute
+    printf "Prepairing to update the system...\n"
     case "$systemName" in 
         'ArchLinux') eval "$ArchLinux";;
         'Debian') eval "$Debian";;
