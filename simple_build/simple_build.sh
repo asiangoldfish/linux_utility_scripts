@@ -153,13 +153,13 @@ function build() {
 
 # Run the program
 function execute_app() {
-    if [ -z "$TARGET_EXECUTABLE" ]; then
-        echo "$NAME: Could not find executable"
-        return 1
-    else
-        "$TARGET_EXECUTABLE"
-        return "$?"
+    # If the executable doesn't exist, then attempt to build the project
+    if [ ! -f "$TARGET_EXECUTABLE" ]; then
+        build || return "$?"
     fi
+    
+    "$TARGET_EXECUTABLE"
+    return "$?"
 }
 
 ####
@@ -220,8 +220,8 @@ Options:
     -e, --execute           run the application
     -h, --help              this page
     -r, --rebuild           rebuild project
-    -v, --verbose           only output stderr
-    -vv, --extra-verbose    output stdout and stderr
+    -v, --verbose           only print errors
+    -vv, --extra-verbose    print outputs and errors
 "
 }
 
@@ -234,42 +234,45 @@ fi
 # Initiate this script's requirements
 ! initiate && exit 0
 
+COMMAND=""                      # Command to execute
+COMMAND_ARGS=""                 # Command arguments
+
 # Loop arguments
 for arg in "$@"; do
-    case "$arg" in
-    "-b" | "--build") # Build project
-        build
-        break
-        ;;
-    "-c" | "--clean") # Clean build files
-        clean
-        break
-        ;;
-    "-e" | "--execute") # Run program
-        if [[ "$EXTRAVERBOSE" -eq 1 ]]; then
-            build
-        elif [[ "$VERBOSE" -eq 1 ]]; then
-            build 1>/dev/null
-        else
-            build &>/dev/null
-        fi
 
-        execute_app
-        break
-        ;;
-    "-r" | "--rebuild") # Delete build files and build project
-        clean && build
-        break
-        ;;
-    "-v" | "--verbose") # Verbose output
-        VERBOSE=1
-        ;;
-    "-vv" | "--extra-verbose") # Extra verbose output
-        EXTRAVERBOSE=1
-        ;;
-    *) # Help page on invalid argument
-        printf "%s: Invalid argument \'%s\'\n" "$0" "$arg"
-        break
-        ;;
-    esac
+    isCommandArg="false"  # Whether this argument is a function argument
+
+    # Assign command to be executed.
+    # When the COMMAND variable is set non-empty, then assume that a command
+    # has already been assigned.
+    if [ -z "$COMMAND" ]; then
+        case "$arg" in
+        "-b" | "--build")   # Build project
+            COMMAND="build"
+            ;;
+        "-c" | "--clean")   # Clean build files
+            COMMAND="clean"
+            ;;
+        "-e" | "--execute") # Run program
+            COMMAND="execute_app"
+            ;;
+        "-r" | "--rebuild") # Delete build files and build project
+            COMMAND="clean && build"
+            ;;
+        esac
+        
+        isCommandArg=true
+        continue
+    fi
+
+    # For any other flags, assume they are flags for the assigned COMMAND
+    if [ "$isCommandArg" == "false" ]; then
+        COMMAND_ARGS="$COMMAND_ARGS $arg"
+    fi
 done
+
+if [ -n "$COMMAND" ]; then 
+    eval $COMMAND $COMMAND_ARGS $VERBOSITY;
+else
+    usage
+fi
