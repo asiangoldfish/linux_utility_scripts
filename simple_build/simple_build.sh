@@ -143,7 +143,8 @@ function clean() {
 function build() {
     # Output error if build command was not found
     if [ -z "$BUILD_COMMAND" ]; then
-        echo "$NAME: Missing build command. Ensure that it's passed using the BUILD_COMMAND variable in file 'parse_conf.sh'" > /dev/stderr
+        printf "%s: Missing build command. Ensure that it's passed using" "$NAME"
+        printf "the BUILD_COMMAND variable in file \'parse_conf.sh\'">/dev/stderr
         return 1
     else
         eval "$BUILD_COMMAND"
