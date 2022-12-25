@@ -5,7 +5,7 @@
 ################################################################################
 NAME="$( basename "$0" )"                                   # This script's name
 LOCAL_SCRIPT="./simple_build.sh"                            # This script's name in a project
-SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # Script parent dir
+SCRIPT_PATH=""                                              # Script parent dir
 CONF_TEMPLATE=''                                            # simple_build.conf template
 
 # If this script exists in the project directory, then use that instead.
@@ -53,21 +53,12 @@ OPTIONS="simple_build.conf"             # Options to configure script behaviour
 # 4. Detects the project's build system
 ####
 function initiate() {
-    # Checks if this script is a working symlink. This is important to properly
-    # find custom functions for specific build systems.
-    if [[ -L "$SCRIPT_PATH/$NAME" ]] && [ -e "$SCRIPT_PATH/$NAME" ]; then
-        # If this script indeed is a symlink, then find the real path
-        SCRIPT_PATH="$( readlink "$( command -v configure.sh )" )" # Ful path
-        SCRIPT_PATH="$( dirname "$SCRIPT_PATH" )"                 # Dirname only
-    else
-        # Executes this block if the link can't be found or is broken.
-        echo "$NAME: This script might be a link, but it doesn't exist"
-        return 1
-    fi
+    # Sets this script's path
+    setScriptPath
 
     # Checks that the ini_parser script exists. This is used to parse variables
     # from the OPTIONS file.
-    INI_PARSER="$SCRIPT_PATH/lib/ini_parser/ini_parser.py" # Ini parser script
+    INI_PARSER="$( dirname $SCRIPT_PATH )/lib/ini_parser/ini_parser.py" # Ini parser script
     if [ ! -f "$INI_PARSER" ]; then
         echo "$NAME: Could not find the ini parser"
         return 1
@@ -87,7 +78,7 @@ function initiate() {
     local tmp_build_file    # Found BUILD_FILE in iterated directory
     local tmp_parse_conf    # Iterated parse_conf.sh
 
-    IFS=' ' read -ra all_dirs <<< "$( echo "$SCRIPT_PATH"/* )"
+    IFS=' ' read -ra all_dirs <<< "$( echo "$( dirname "$SCRIPT_PATH" )"/* )"
 
     for dir in "${all_dirs[@]}"; do
         # Skip iteration if the selected item is not a directory
@@ -172,14 +163,6 @@ function execute_app() {
 }
 
 ####
-# Helper function that finds the absolute file path of the
-# simple_build.conf template
-####
-function setConfTemplate() {
-    CONF_TEMPLATE="$SCRIPT_PATH/sb_conf.template"
-}
-
-####
 # Copy the simple_build.conf template to $PWD
 function generateOptionsFile() {
     # Figure where the template is stored on the system
@@ -195,6 +178,33 @@ function generateOptionsFile() {
         return 1
     else
         return 0
+    fi
+}
+
+####
+# Helper function that finds the absolute file path of the
+# simple_build.conf template
+####
+function setConfTemplate() {
+    CONF_TEMPLATE="$SCRIPT_PATH/sb_conf.template"
+}
+
+####
+# Sets this script's file path. If it's a symlink, then gets the original path
+####
+function setScriptPath() {
+    local isSymlink     # Whether this script is a symlink
+
+    if [ -z "$( ls -l "$0" | awk '{print $11}' )" ]; then
+        isSymlink=false
+    else
+        isSymlink=true
+    fi
+
+    if [ "$isSymlink" == false ]; then
+        SCRIPT_PATH="$0"
+    else
+        SCRIPT_PATH="$( ls -l "$0" | awk '{print $11}' )"
     fi
 }
 
