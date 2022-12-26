@@ -142,32 +142,55 @@ function execute_app() {
         fi
     done
 
-    # If the executable doesn't exist, then attempt to build the project
-    if [ ! -f "$TARGET_EXECUTABLE" ]; then
+    # If the executable doesn't exist, then attempt to build the project. This
+    # assumes that a build system was found
+    if [ ! -f "$TARGET_EXECUTABLE" ] && [ -n "$BUILD_SYSTEM" ]; then
         build "$@" || return "$?"
+        "$TARGET_EXECUTABLE"
+    else
+        eval "$TARGET_EXECUTABLE"
     fi
     
-    "$TARGET_EXECUTABLE"
     return "$?"
 }
 
 ####
-# Copy the simple_build.conf template to $PWD
+# Generate a simple_build.conf template to local project directory
+#
+# The generated simple_build.conf is copied from this script directory's
+# sb_conf.template. The user is also offered to review it using the set $EDITOR
+# environment variable.
+####
 function generateOptionsFile() {
-    # Figure where the template is stored on the system
+    local editorChoice      # yes or no
+    
+    # Set the template absolute system filepath
     setConfTemplate
 
+    # Generate simple_build.conf if none is found in the local project directory
     if [ ! -f "./simple_build.conf" ]; then
         echo "Generating simple_build.conf..."
-
         cp "$CONF_TEMPLATE" "$PWD/simple_build.conf"
 
-        echo "simple_build.conf has been generated."
-        echo "Please review it before executing this command again"
-        return 1
-    else
-        return 0
+        # Allow editing the file using the $EDITOR environment variable if set
+        if [ -z "$EDITOR" ]; then
+            # EDITOR variable is empty or not set
+            echo -e "Manually editing simple_build.conf is advised"
+            return 0
+        else
+            # Prompt user to review the simple_build.conf with EDITOR
+            read -p "Review using $( basename "$EDITOR" )? [Y/n] " editorChoice
+        fi
+
+        if [ -z "$editorChoice" ] || [[ "$editorChoice" == [Yy] ]]; then
+            "$EDITOR" "./simple_build.conf"
+        else
+            echo "Manually editing simple_build.conf is advised"
+            return 1
+        fi
     fi
+    
+    return 0
 }
 
 ####
@@ -219,7 +242,7 @@ function initiate() {
 # simple_build.conf template
 ####
 function setConfTemplate() {
-    CONF_TEMPLATE="$SCRIPT_PATH/sb_conf.template"
+    CONF_TEMPLATE="$( dirname $SCRIPT_PATH )/sb_conf.template"
 }
 
 ####
