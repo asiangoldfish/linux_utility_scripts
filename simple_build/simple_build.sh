@@ -36,41 +36,56 @@ BUILD_FILE=""                           # Special config file for the build
 
 INI_PARSER=""                           # Ini parser script
 
-VERBOSE=0                               # Whether to verbose output
-EXTRAVERBOSE=0                          # Whether to extra verbose output
-
 OPTIONS="simple_build.conf"             # Options to configure script behaviour
 ################################################################################
 
 ####
-# Initiates important processes for this script
-#
-# 1. Figures out wether this script is a working symlink and sets its path
-#    accordingly
-# 2. Checks whether the ini parser exists and returns an error if not
-# 3. Checks whether the target project includes an options file. See OPTIONS
-#    for its filepath
-# 4. Detects the project's build system
+# This function is the first one executed in this program
 ####
-function initiate() {
-    # Sets this script's path
-    setScriptPath
+function main() {
+    # Initiate this script's requirements
+    ! initiate && return 1
 
-    # Checks that the ini_parser script exists. This is used to parse variables
-    # from the OPTIONS file.
-    INI_PARSER="$( dirname $SCRIPT_PATH )/lib/ini_parser/ini_parser.py" # Ini parser script
-    if [ ! -f "$INI_PARSER" ]; then
-        echo "$NAME: Could not find the ini parser"
+    # Parses command-line arguments and executes functions accordingly
+    parseArgsAndExecute "$@"
+}
+
+# Build project
+function build() {
+    # Determine verbosity
+    local VERBOSITY="&>/dev/null"
+    for arg in "$@"; do
+        case "$arg" in
+        "-v"  | "--verbose"      ) VERBOSITY="1>/dev/null"; break;;
+        "-vv" | "--extra-verbose") VERBOSITY=""; break;;
+        esac
+    done
+
+    # Output error if build command was not found
+    if [ -z "$BUILD_COMMAND" ]; then
+     printf "%s: Missing build command. Ensure that it's passed using " "$NAME"
+     printf "the BUILD_COMMAND variable in file \'parse_conf.sh\'\n">/dev/stderr
         return 1
+    else
+        eval "$BUILD_COMMAND" "$VERBOSITY"
+        return "$?"
     fi
+}
 
-    # Generate an options file if it doesn't already exist
-    if [ ! -f "$OPTIONS" ]; then
-        generateOptionsFile
+# Clean build directory
+function clean() {
+    # Output error if clean command is not found
+    if [ -z "$CLEAN_COMMAND" ]; then
+        echo "$NAME: Clean command not found" > /dev/stderr
         return 1
+    else
+        eval "$CLEAN_COMMAND"
+        return "$?"
     fi
+}
 
-    # Detect build system by iterating all directories in the SCRIPT_PATH,
+function detectBuildSystem() {
+       # Detect build system by iterating all directories in the SCRIPT_PATH,
     # excluding directories from EXCLUDE_DIRS. Then, source parse_conf.sh
     # accordingly
     local all_dirs          # All directories within the script's path
@@ -112,51 +127,24 @@ function initiate() {
 echo -e "\tUnexpected behavioural in the if-statements. This shouldn't happen"
         fi
     done
-
-    # Return 1 if no build system was found, else 0
-    if [ -z "$BUILD_FILE" ]; then 
-        echo "$NAME: Could not detect build system"
-        return 1
-    fi
-
-    # Source local project's simple_build.conf
-    if [ -f "./simple_build.conf" ]; then
-        source "./simple_build.conf"
-    fi
-
-    return 0
-}
-
-# Clean build directory
-function clean() {
-    # Output error if clean command is not found
-    if [ -z "$CLEAN_COMMAND" ]; then
-        echo "$NAME: Clean command not found" > /dev/stderr
-        return 1
-    else
-        eval "$CLEAN_COMMAND"
-        return "$?"
-    fi
-}
-
-# Build project
-function build() {
-    # Output error if build command was not found
-    if [ -z "$BUILD_COMMAND" ]; then
-        printf "%s: Missing build command. Ensure that it's passed using" "$NAME"
-        printf "the BUILD_COMMAND variable in file \'parse_conf.sh\'">/dev/stderr
-        return 1
-    else
-        eval "$BUILD_COMMAND"
-        return "$?"
-    fi
 }
 
 # Run the program
 function execute_app() {
+    # Determine verbosity. This is passed to the build function
+    local VERBOSITY
+    for arg in "$@"; do
+        if [ "$arg" == "-v" ] || \
+        [ "$arg" == "-vv" ] || \
+        [ "$arg" == "--verbose" ] || \
+        [ "$arg" == "--extra-verbose" ]; then
+            VERBOSITY="$arg"
+        fi
+    done
+
     # If the executable doesn't exist, then attempt to build the project
     if [ ! -f "$TARGET_EXECUTABLE" ]; then
-        build || return "$?"
+        build "$@" || return "$?"
     fi
     
     "$TARGET_EXECUTABLE"
@@ -180,6 +168,50 @@ function generateOptionsFile() {
     else
         return 0
     fi
+}
+
+####
+# Initiates important processes for this script
+#
+# 1. Figures out wether this script is a working symlink and sets its path
+#    accordingly
+# 2. Checks whether the ini parser exists and returns an error if not
+# 3. Checks whether the target project includes an options file. See OPTIONS
+#    for its filepath
+# 4. Detects the project's build system
+####
+function initiate() {
+    # Sets this script's path
+    setScriptPath
+
+    # Checks that the ini_parser script exists. This is used to parse variables
+    # from the OPTIONS file.
+    INI_PARSER="$( dirname $SCRIPT_PATH )/lib/ini_parser/ini_parser.py" # Ini parser script
+    if [ ! -f "$INI_PARSER" ]; then
+        echo "$NAME: Could not find the ini parser"
+        return 1
+    fi
+
+    # Generate an options file if it doesn't already exist
+    if [ ! -f "$OPTIONS" ]; then
+        generateOptionsFile
+        return 1
+    fi
+
+    detectBuildSystem || return 1
+
+    # Return 1 if no build system was found, else 0
+    if [ -z "$BUILD_FILE" ]; then 
+        echo "$NAME: Could not detect build system"
+        return 1
+    fi
+
+    # Source local project's simple_build.conf
+    if [ -f "./simple_build.conf" ]; then
+        source "./simple_build.conf"
+    fi
+
+    return 0
 }
 
 ####
@@ -226,54 +258,24 @@ Options:
 "
 }
 
-# Help page when running without arguments
-if [ "$#" == 0 ]; then
-    usage
-    exit 0
-fi
+function parseArgsAndExecute() {
+    # Help page when running without arguments
+    if [ "$#" == 0 ]; then
+        usage
+        exit 0
+    fi
 
-# Initiate this script's requirements
-! initiate && exit 0
-
-COMMAND=""                      # Command to execute
-COMMAND_ARGS=""                 # Command arguments
-
-# Loop arguments
-for arg in "$@"; do
-
-    isCommandArg="false"  # Whether this argument is a function argument
-
-    # Assign command to be executed.
-    # When the COMMAND variable is set non-empty, then assume that a command
-    # has already been assigned.
-    if [ -z "$COMMAND" ]; then
+    # Loop arguments
+    for arg in "$@"; do
         case "$arg" in
-        "-b" | "--build")   # Build project
-            COMMAND="build"
-            ;;
-        "-c" | "--clean")   # Clean build files
-            COMMAND="clean"
-            ;;
-        "-e" | "--execute") # Run program
-            COMMAND="execute_app"
-            ;;
-        "-r" | "--rebuild") # Delete build files and build project
-            COMMAND="clean && build"
-            ;;
+        "-b" | "--build") build "$@"; break;;
+        "-c" | "--clean") clean "$@"; break;;
+        "-e" | "--execute") execute_app "$@"; break;;
+        "-r" | "--rebuild") clean && build; break;;
         esac
-        
-        isCommandArg=true
-        continue
-    fi
+    done
+}
 
-    # For any other flags, assume they are flags for the assigned COMMAND
-    if [ "$isCommandArg" == "false" ]; then
-        COMMAND_ARGS="$COMMAND_ARGS $arg"
-    fi
-done
-
-if [ -n "$COMMAND" ]; then 
-    eval $COMMAND $COMMAND_ARGS $VERBOSITY;
-else
-    usage
-fi
+################################################################################
+main "$@"
+################################################################################
