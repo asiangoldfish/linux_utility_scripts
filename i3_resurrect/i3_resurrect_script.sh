@@ -1,12 +1,12 @@
 #!/usr/bin/bash
 
 NUM_OF_WORKSPACE=9
-KEEP_WORKSPACES=false
+KEEP_WORKSPACES=true
 
 # Save workspaces 
 if [ "$1" == "--save" ]; then
     echo "Saving workspaces:"
-    for i in $(seq 1 $NUM_OF_WORKSPACE); do
+    for i in {1..9}; do
         i3-resurrect save -w "$i"
         echo "Workspace $i [Complete]"
     done
@@ -14,7 +14,7 @@ if [ "$1" == "--save" ]; then
 # Restore workspaces
 elif [ "$1" == "--restore" ]; then
     echo "Restoring workspaces:"
-    for i in $(seq $NUM_OF_WORKSPACE 1); do
+    for i in {9..1..-1}; do
         i3-resurrect restore -w "$i"
         echo "Workspace $i [Complete]"
     done
@@ -22,7 +22,7 @@ elif [ "$1" == "--restore" ]; then
     # Automatically clear all saved workspaces after restoring them
     if [ "$KEEP_WORKSPACES" == "false" ]; then
         echo "Clearing saved workspaces..."
-        for i in $(seq 1 $NUM_OF_WORKSPACE); do
+        for i in {1..9}; do
             i3-resurrect rm -w "$i"
         done
     fi
