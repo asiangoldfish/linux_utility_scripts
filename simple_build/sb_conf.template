@@ -1,3 +1,7 @@
+# Command to run an application. If this variable is non-empty, then it skips
+# the build process before running executable file
+RUN_COMMAND=""
+
 # Directory where all compiled binaries reside
 BUILD_DIR="./bin"
 

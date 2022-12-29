@@ -43,9 +43,6 @@ OPTIONS="simple_build.conf"             # Options to configure script behaviour
 # This function is the first one executed in this program
 ####
 function main() {
-    # Initiate this script's requirements
-    ! initiate && return 1
-
     # Parses command-line arguments and executes functions accordingly
     parseArgsAndExecute "$@"
 }
@@ -142,13 +139,20 @@ function execute_app() {
         fi
     done
 
-    # If the executable doesn't exist, then attempt to build the project. This
-    # assumes that a build system was found
-    if [ ! -f "$TARGET_EXECUTABLE" ] && [ -n "$BUILD_SYSTEM" ]; then
-        build "$@" || return "$?"
-        "$TARGET_EXECUTABLE"
+    # If run command was detected from simple_build.conf, then execute that command
+    if [ -n "$RUN_COMMAND" ]; then
+        eval "$RUN_COMMAND"
+
+    # else, build project and run executable file
     else
-        eval "$TARGET_EXECUTABLE"
+        # If the executable doesn't exist, then attempt to build the project. This
+        # assumes that a build system was found
+        if [ ! -f "$TARGET_EXECUTABLE" ] && [ -n "$BUILD_SYSTEM" ]; then
+            build "$@" || return "$?"
+            "$TARGET_EXECUTABLE"
+        else
+            eval "$TARGET_EXECUTABLE"
+        fi
     fi
     
     return "$?"
@@ -291,10 +295,27 @@ function parseArgsAndExecute() {
     # Loop arguments
     for arg in "$@"; do
         case "$arg" in
-        "-b" | "--build") build "$@"; break;;
-        "-c" | "--clean") clean "$@"; break;;
-        "-e" | "--execute") execute_app "$@"; break;;
-        "-r" | "--rebuild") clean && build; break;;
+        "-b" | "--build")
+            ! initiate && return 1
+            build "$@"
+            break;;
+        "-c" | "--clean") 
+            clean "$@" 
+            break;;
+        "-e" | "--execute") 
+            ! initiate && return 1
+            execute_app "$@"
+            break;;
+        "-h" | "--help")
+            usage
+            break;;
+        "-r" | "--rebuild") 
+            ! initiate && return 1
+            clean && build
+            break;;
+        * )
+            echo "$NAME: Unrecognized command $arg. Use --help for commands"
+            break;;
         esac
     done
 }
