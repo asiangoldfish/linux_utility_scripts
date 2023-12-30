@@ -2,43 +2,34 @@
 
 function main() {
 
-    STATE_FILE="$HOME/.touchpad_toggle"     # File to store state in
-    STATE="$( cat "$STATE_FILE" || echo 1 )"          # Touchpad ON/OFF state
-    
     # Iterate all lines to find the Touchpad, if the device is supported
     if ! xinput list | grep -q "Touchpad"; then
-        echo "Touchpad is not supported"
+        echo "Unable to find a supported touchpad. Nothing was changed."
         exit 1
     fi
 
     # Find the device id. Call it by using the following syntax:
     # ${found_id[1]}
+    local IFS
     IFS='=' read -ra found_id <<< "$( xinput list | grep "Touchpad" | awk '{print $6}' )"
-    id="${found_id[1]}"
+    local id="${found_id[1]}"
 
     # Check if device is enabled. The value is inverted, so invert before using it
-    #isDeviceEnabled="$( xinput list-props 11 | grep "Device Enabled" | awk '{print $4}' )"
-
-    if [ -z "$RESTORE" ]; then
-        if [ "$STATE" == 0 ]; then
-            STATE=1
-            echo "Touchpad enabled"
-        else
-            STATE=0
-            echo "Touchpad disabled"
-        fi
-
-        # Store the new state in STATE_FILE
-        printf '%s' "$STATE" > "$STATE_FILE"
+    local isDeviceEnabled="$( xinput list-props $id | grep "Device Enabled" | awk '{print $4}' )"
+    
+    # Set new state. It's the inverse of the current
+    local newState
+    if [ "$isDeviceEnabled" == "0" ]; then
+        newState=1
+        echo "Touchpad is enabled"
+    else
+        newState=0
+        echo "Touchpad is disabled"
     fi
+    
 
     # Toggle touchpad
-    xinput set-prop "$id" "Device Enabled" "$STATE"
+    xinput set-prop "$id" "Device Enabled" "$newState"
 }
-
-case "$1" in 
-    "--restore" )
-        RESTORE=1
-esac
 
 main
