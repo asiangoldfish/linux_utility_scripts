@@ -18,6 +18,7 @@ extract () {
                 *.bz2)      bunzip2 $arg      ;;
                 *.gz)       gunzip $arg       ;;
                 *.tar)      tar xf $arg       ;;
+                *.tar.xz)   tar xf $arg       ;;
                 *.tbz2)     tar xjf $arg      ;;
                 *.tgz)      tar xzf $arg      ;;
                 *.zip)      unzip $arg        ;;
