@@ -1,17 +1,43 @@
-#!/usr/bin/bash
+#!/usr/bin/env bash
 
-function server() {
-    local user
-    local address
+# List of valid targets
+NAMES=(
+    "ubuntu"
+)
+TARGETS=(
+    "127.0.0.1"
+)
 
-    if [ -z "$1" ]; then
-        user=                   # Default user to connect to
-    else
-        user="$1"
-    fi
-        address=""              # Device ip address or hostname
+function usage() {
+    echo "Usage: remote.sh [TARGET]
 
-    ssh "$user"@"$address"
+Enter a valid target to connect to it.
+Available targets:"
+
+    local ip
+    for ip in "$NAMES"; do
+        printf "\t$ip\n"
+    done
 
     return 0
 }
+
+# No commands were passed. Print help page
+if [ -z "$1" ]; then
+    usage
+    exit 1
+fi
+
+let index=0
+for ip in "${NAMES[@]}"; do
+    if [ "$1" == "$ip" ]; then
+        # IP was found
+        ssh "${USERS[$index]}@${TARGETS[$index]}"
+        exit "$?"
+    fi
+
+    let index++
+done
+
+echo "Target $1 not found"
+
