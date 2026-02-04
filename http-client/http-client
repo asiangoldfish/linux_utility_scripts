@@ -3,6 +3,7 @@
 import json
 import sys
 import http.client
+from pathlib import Path
 
 class Request:
     def __init__(self) -> None:
@@ -15,14 +16,18 @@ class Request:
 
     def unmarshall(self, json_obj) -> Bool:
         # TODO validate JSON fields
-        self.url = json_obj["url"]
+        self.url = json_obj.get("url")
+        if self.url is None:
+            print("Request is missing field 'url'")
+            return False
+
         self.method = json_obj["method"]
-        self.headers = json_obj["headers"]
+        self.headers = json_obj.get("headers", {})
         self.endpoint = json_obj["endpoint"]
         self.port = json_obj["port"]
 
         # Keep in mind that data can be in different formats
-        self.data = json_obj["data"]
+        self.data = json_obj.get("data")
 
         if self.method not in ["GET", "POST", "PUT", "OPTION"]:
             print("Method \'" + self.method + "\' not supported")
@@ -62,18 +67,60 @@ class Request:
 
 
 def usage():
-    print("""Usage: http.py <config-file> <request-name>
+    print("""Usage: http-client.py <config-file> <request-name> OPTIONS
+
+http-client.py is a simple, internal Python script for local development. It is
+an HTTP client used to run HTTP tests or testing endpoints. You can store
+project specific configuration files, so you don't need to clutter your one
+and only HTTP client with requests from all your projects.
+
+The script's goal is to provide an alternative to curl. Whereas you would
+write the complete request directly in your terminal, you now specify the
+request meta data in a file.
+
+Optional arguments:
+  -g, --generate-config         generate a configuration template
 """, end='')
+
+def generate_config():
+    config_path = Path("http.json")
+
+    if config_path.is_file():
+        print("http.json already exists")
+        return
+
+    template = [
+        {
+            "request_name": {
+                "url": "localhost",
+                "port": 8080,
+                "endpoint": "/health",
+                "method": "POST",
+                "headers": {
+                    "Content-Type": "application/json"
+                },
+                "data": ""
+            }
+        }
+    ]
+
+    with open("http.json", "w") as fp:
+        json.dump(template, fp, indent=4)
 
 # Default: help page
 if len(sys.argv) <= 1:
     usage()
     exit(0)
 
+# Check for arguments
+for arg in sys.argv:
+    if arg in ["-g", "--generate-config"]:
+        generate_config()
+        exit(0)
 
+# Assume user wants to run the HTTP client.
 if len(sys.argv) != 3:
     print("Missing arguments: <config-file> and <request-name>")
-    usage()
     exit(0)
 
 FILE_NAME = sys.argv[1]
