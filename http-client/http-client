@@ -1,0 +1,110 @@
+#!/usr/bin/env python
+
+import json
+import sys
+import http.client
+
+class Request:
+    def __init__(self) -> None:
+        self.url = ""
+        self.endpoint = ""
+        self.method = ""
+        self.headers = []
+        self.data = object
+        self.port = 0
+
+    def unmarshall(self, json_obj) -> Bool:
+        # TODO validate JSON fields
+        self.url = json_obj["url"]
+        self.method = json_obj["method"]
+        self.headers = json_obj["headers"]
+        self.endpoint = json_obj["endpoint"]
+        self.port = json_obj["port"]
+
+        # Keep in mind that data can be in different formats
+        self.data = json_obj["data"]
+
+        if self.method not in ["GET", "POST", "PUT", "OPTION"]:
+            print("Method \'" + self.method + "\' not supported")
+            return False
+
+        return True
+
+    def send_request(self):
+        print("Sending request..")
+        connection = http.client.HTTPConnection(self.url, self.port)
+
+        # Define headers and body
+        headers = self.headers
+
+        # Send the request
+        connection.request(
+                self.method, self.endpoint, json.dumps(self.data), self.headers)
+
+        # Get the response
+        response = connection.getresponse()
+
+        # print(f"Status: {response.status} and reason: {response.reason}")
+
+        # Read and decode the response
+        content_length_str = response.getheader('Content-Length')
+        if content_length_str is not None:
+            content_length = int(content_length_str)
+            if content_length > 0:
+                data = response.read().decode('utf-8')
+                print("Response:")
+                # Response body can be JSON or plain text
+                try:
+                    json_response = json.loads(data)
+                    print(json_response)
+                except json.decoder.JSONDecodeError as e:
+                    print(data)
+
+
+def usage():
+    print("""Usage: http.py <config-file> <request-name>
+""", end='')
+
+# Default: help page
+if len(sys.argv) <= 1:
+    usage()
+    exit(0)
+
+
+if len(sys.argv) != 3:
+    print("Missing arguments: <config-file> and <request-name>")
+    usage()
+    exit(0)
+
+FILE_NAME = sys.argv[1]
+REQUEST_NAME = sys.argv[2]
+
+request_object = {}
+
+# Register the JSON object
+with open(FILE_NAME) as f:
+    json_file = json.load(f)
+    request_object = json_file
+
+# We require the top level to be a list
+if type(request_object) is not list:
+    print("Top level must be an array", file=sys.stderr)
+    exit(1)
+
+# Check if any requests exist
+if len(request_object) == 0:
+    print("No requests found in " + FILE_NAME, file=sys.stderr)
+    exit(1)
+
+req = Request()
+exit_code = False
+for req_obj in request_object:
+    if req_obj.get(REQUEST_NAME):
+        exit_code = req.unmarshall(req_obj.get(REQUEST_NAME))
+        break
+
+
+if exit_code is False:
+    exit(1)
+
+req.send_request()
